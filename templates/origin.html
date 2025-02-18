@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fullscreen Video with UID, Cached Commercial & Separate Display Config</title>
+  <style>
+    /* Reset default margins and ensure full viewport */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000;
+    }
+    /* Fullscreen video container */
+    .video-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: #000;
+      z-index: 9999;
+    }
+    /* Video element styled to cover the container */
+    video.fullscreen-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background-color: #000;
+      transition: filter 0.3s ease;
+    }
+  </style>
+</head>
+<body>
+  <!-- Container wrapping the video element -->
+  <div class="video-container">
+    <video class="fullscreen-video" autoplay muted playsinline controls>
+      <source src="path_to_your_video.mp4" type="video/mp4">
+      Your browser does not support HTML5 video.
+    </video>
+  </div>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // --- Service Worker Registration ---
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+          .then(function(registration) {
+            console.log('Service Worker registered with scope:', registration.scope);
+          })
+          .catch(function(error) {
+            console.error('Service Worker registration failed:', error);
+          });
+      }
+
+      // --- Element References ---
+      var container = document.querySelector('.video-container');
+      var videoElement = document.querySelector('.fullscreen-video');
+
+      // --- Utility: Cookie Retrieval ---
+      function getCookie(name) {
+        var nameEQ = name + "=";
+        var ca = document.cookie.split(';');
+        for (var i = 0; i < ca.length; i++) {
+          var c = ca[i].trim();
+          if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length);
+        }
+        return null;
+      }
+
+      // Retrieve UID from cookie; if not found, redirect to registration.
+      var uid = getCookie("uid");
+      if (!uid) {
+        window.location.href = 'http://0.0.0.0:8000/register_device.html';
+        return;
+      }
+
+      // --- Function: Apply Display Configuration ---
+      function applyDisplayConfig(config) {
+        // Compose the CSS filter string using the flat JSON values.
+        var filterString =
+          'brightness(' + config.brightness + '%) ' +
+          'contrast(' + config.contrast + '%) ' +
+          'saturate(' + config.saturation + '%) ' +
+          'hue-rotate(' + config.hue + 'deg) ' +
+          'blur(' + config.blur + 'px) ' +
+          'grayscale(' + config.grayscale + '%) ' +
+          'invert(' + config.invert + '%) ' +
+          'sepia(' + config.sepia + '%) ' +
+          'opacity(' + config.opacity + '%)';
+        videoElement.style.filter = filterString;
+      }
+
+      // --- Function: Fetch Display Configuration ---
+      function fetchDisplayConfig() {
+        var url = 'https://ds.manager.indigoingenium.ba/get_display_config';
+        var payload = { uuid: uid };
+        return fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+          // Data is the flat configuration object.
+          return data;
+        })
+        .catch(function(error) {
+          console.error('Error fetching display config:', error);
+          return null;
+        });
+      }
+
+      // --- Ad Fetching & Prefetch Logic ---
+      var currentAdUrl = "";
+      var nextAdUrl = "";
+      var isFetching = false;
+
+      function fetchAd() {
+        var url = 'https://ds.manager.indigoingenium.ba/get_ad';
+        var payload = { uuid: uid };
+        return fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+          // Handle redirection.
+          if (data.name === 'Redirection') {
+            window.location.href = data.url;
+            return null;
+          } else if (data.name === 'Advertisement') {
+            return data;
+          }
+          return null;
+        })
+        .catch(function(error) {
+          console.error('Error fetching ad:', error);
+          return null;
+        });
+      }
+
+      function prefetchNextAd() {
+        if (isFetching) return;
+        isFetching = true;
+        fetchAd().then(function(adData) {
+          if (adData && adData.url) {
+            nextAdUrl = adData.url;
+            console.log('Prefetched next ad:', nextAdUrl);
+          }
+          isFetching = false;
+        });
+      }
+
+      // --- Function: Play Ad with Display Config ---
+      function playAd(url) {
+        if (!url) return;
+        // Pause current video and set the new source.
+        videoElement.pause();
+        videoElement.src = url;
+        videoElement.load();
+        // Fetch display config and apply before playing.
+        fetchDisplayConfig().then(function(config) {
+          if (config) {
+            applyDisplayConfig(config);
+          }
+          videoElement.play().catch(function(err) {
+            console.error('Error playing video:', err);
+          });
+        });
+      }
+
+      // On initial load, fetch and play the first ad, then prefetch the next.
+      fetchAd().then(function(adData) {
+        if (adData && adData.url) {
+          currentAdUrl = adData.url;
+          playAd(currentAdUrl);
+          prefetchNextAd();
+        }
+      });
+
+      // When the current commercial finishes, play the prefetched ad.
+      videoElement.addEventListener('ended', function() {
+        if (nextAdUrl) {
+          currentAdUrl = nextAdUrl;
+          playAd(currentAdUrl);
+          nextAdUrl = "";
+          prefetchNextAd();
+        } else {
+          fetchAd().then(function(adData) {
+            if (adData && adData.url) {
+              currentAdUrl = adData.url;
+              playAd(currentAdUrl);
+              prefetchNextAd();
+            }
+          });
+        }
+      });
+
+      // --- Fullscreen Request ---
+      function requestFullScreen() {
+        if (container.requestFullscreen) {
+          container.requestFullscreen().catch(console.error);
+        } else if (container.webkitRequestFullscreen) {
+          container.webkitRequestFullscreen();
+        } else if (container.mozRequestFullScreen) {
+          container.mozRequestFullScreen();
+        } else if (container.msRequestFullscreen) {
+          container.msRequestFullscreen();
+        }
+      }
+
+      videoElement.addEventListener('loadedmetadata', function() {
+        if (!document.fullscreenElement) {
+          requestFullScreen();
+        }
+      });
+
+      // --- Focus Reporting ---
+      function reportFocus(isFocused) {
+        var reportUrl = 'https://ds.manager.indigoingenium.ba/report_focus';
+        var payload = {
+          uuid: uid,
+          date: new Date().toISOString(),
+          is_in_focus: isFocused ? 1 : 0
+        };
+        fetch(reportUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).catch(function(error) {
+          console.error('Error reporting focus:', error);
+        });
+      }
+
+      window.addEventListener('focus', function() {
+        reportFocus(true);
+      });
+      window.addEventListener('blur', function() {
+        reportFocus(false);
+      });
+    });
+  </script>
+</body>
+</html>

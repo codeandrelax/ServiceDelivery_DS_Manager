@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>UID Display</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f7f7f7;
+      color: #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: #fff;
+      padding: 20px 40px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .uid {
+      font-size: 1.5em;
+      color: #0073e6;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Your UID</h1>
+    <p class="uid" id="uidDisplay">Checking UID...</p>
+  </div>
+
+  <script>
+    /**
+     * Retrieves a cookie value by name.
+     * @param {string} name - The name of the cookie.
+     * @returns {string|null} The cookie value, or null if not found.
+     */
+    function getCookie(name) {
+      const nameEQ = name + "=";
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        let c = cookies[i].trim();
+        if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length);
+      }
+      return null;
+    }
+
+    /**
+     * Checks for the UID cookie and either displays it or redirects.
+     */
+    function checkAndRedirect() {
+      setTimeout(() => {
+        console.log("Document cookies:", document.cookie);
+        let uid = getCookie("uid");
+        if (uid) {
+          document.getElementById('uidDisplay').innerText = uid;
+        } else {
+          // Redirect to registration if no UID is found.
+          window.location.href = "https://ds.manager.indigoingenium.ba/register_device";
+        }
+      }, 500);
+    }
+
+    // Execute the check on page load.
+    checkAndRedirect();
+  </script>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>UID Cookie Display & Registration Check</title>
+  <style>
+    /* Basic styling */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f7f7f7;
+      color: #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: #fff;
+      padding: 20px 40px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .uid {
+      font-size: 1.5em;
+      color: #0073e6;
+      word-break: break-all;
+    }
+    .attempts {
+      margin-top: 20px;
+      font-size: 1em;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Your UID Cookie</h1>
+    <p class="uid" id="uidDisplay"></p>
+    <p class="attempts" id="attemptsDisplay"></p>
+  </div>
+
+  <script>
+    /**
+     * Retrieves a cookie value by name.
+     * @param {string} name - The name of the cookie.
+     * @returns {string|null} The cookie value, or null if not found.
+     */
+    function getCookie(name) {
+      const nameEQ = name + "=";
+      const ca = document.cookie.split(';');
+      for (let i = 0; i < ca.length; i++) {
+        let c = ca[i].trim();
+        if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length);
+      }
+      return null;
+    }
+
+    /**
+     * Sets a cookie with the specified name, value, and expiration in days.
+     * @param {string} name - The cookie name.
+     * @param {string} value - The cookie value.
+     * @param {number} days - Expiration time in days.
+     */
+    /**
+     * Sets a cookie with the specified name, value, expiration in days, and domain.
+     * @param {string} name - The cookie name.
+     * @param {string} value - The cookie value.
+     * @param {number} days - Expiration time in days.
+     */
+    function setCookie(name, value, days) {
+      let expires = "";
+      if (days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = "; expires=" + date.toUTCString();
+      }
+      // Set cookie for the entire domain indigoingenium.ba and its subdomains.
+      document.cookie = name + "=" + (value || "") + expires + "; path=/; domain=.indigoingenium.ba";
+    }
+
+
+    /**
+     * Generates a UID in the format xx:xx:xx:xx:xx:xx using cryptographically secure random bytes.
+     * The UID is forced to lowercase.
+     * @returns {string} The generated UID.
+     */
+    function generateUid() {
+      const array = new Uint8Array(6);
+      window.crypto.getRandomValues(array);
+      const hexArray = Array.from(array, byte => byte.toString(16).padStart(2, '0'));
+      return hexArray.join(':').toLowerCase();
+    }
+
+    // Check for the "uid" cookie; if it does not exist, generate and store one.
+    let uid = getCookie("uid");
+    if (!uid) {
+      uid = generateUid();
+      setCookie("uid", uid, 365);
+    }
+    // Ensure the UID is in lowercase.
+    uid = uid.toLowerCase();
+    document.getElementById('uidDisplay').innerText = uid;
+
+    // Initialize attempt counter.
+    let attemptCount = 0;
+
+    /**
+     * Sends a POST request to check if the device is registered.
+     * - If the response contains a "Redirect" property, the browser is redirected.
+     * - If the response indicates the device is not registered, the UID remains unchanged.
+     * - The check is repeated every 3 seconds.
+     */
+    function checkRegistration() {
+        attemptCount++;
+        document.getElementById('attemptsDisplay').innerText = "Attempt #" + attemptCount;
+        
+        const payload = { uuid: uid };
+        console.log('Checking registration with payload:', payload); // Debugging log
+        
+        fetch('https://ds.manager.indigoingenium.ba/check_if_registered', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+        console.log('Response received:', data); // Debugging log
+        
+        if (data.Redirect) {
+          // Device is registered; redirect immediately.
+          console.log("Dobio sam " + data.Redirect);
+          window.location.href = data.Redirect;
+          window.location.href = "https://ds.manager.indigoingenium.ba/origin";
+          
+        } else if (data["Non-redirect"] === "Device not registered") {
+          // Device not registered; keep existing UID and try again.
+          setTimeout(checkRegistration, 3000);
+        } else {
+          // Unexpected response; try again.
+          setTimeout(checkRegistration, 3000);
+        }
+        })
+        .catch(error => {
+        console.error('Error checking registration:', error);
+        setTimeout(checkRegistration, 3000);
+        });
+    }
+
+    // Begin the registration check on page load.
+    checkRegistration();
+  </script>
+</body>
+</html>`
