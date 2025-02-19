@@ -324,3 +324,8 @@ WHERE uuid = 'b1:a1:27:0f:31:01';
 ## get_monthly_report
 ## set_display_enabled_to
 ## register_new_ad
+## register_admin
+
+This is done via Delight IM AUTH (php)
+## register_client
+Registering a client is done same as registering admin with one extra API call -> register_client
