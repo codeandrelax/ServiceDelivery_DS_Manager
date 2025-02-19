@@ -111,6 +111,19 @@ def handle_video_request(environ, start_response, cors_headers):
     
     return environ.get('wsgi.file_wrapper', open)(filepath, 'rb')
 
+# Debug route
+@path_handler('/list_videos')
+def handle_list_videos(environ, start_response, cors_headers):
+    """Logs and returns a list of available video files in VIDEO_DIR."""
+    try:
+        video_files = [f for f in os.listdir(VIDEO_DIR) if f.endswith('.mp4')]
+        print(f"[LOG] Available videos: {video_files}")  # Log to console
+    except Exception as e:
+        print(f"[ERROR] Failed to list videos: {str(e)}")
+        return send_response(start_response, '500 Internal Server Error', {"error": str(e)}, cors_headers)
+
+    return send_response(start_response, '200 OK', {"videos": video_files}, cors_headers)
+
 @path_handler('/get_ad')
 def handle_get_ad_request(environ, start_response, cors_headers):
     try:
