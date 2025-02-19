@@ -23,8 +23,8 @@ videos = [
 ##################################
 
 videos_for_signature = [
-    {"name": "Advertisement", "filename": "Tuborg.mp4"},
-    {"name": "Advertisement", "filename": "Heineken.mp4"},
+    {"name": "Advertisement", "filename": "BudLight.mp4"},
+    {"name": "Advertisement", "filename": "BudLight.mp4"},
     {"name": "Advertisement", "filename": "BudLight.mp4"},
 ]
 
